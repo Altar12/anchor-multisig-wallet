@@ -1,8 +1,14 @@
 use crate::ID;
 use anchor_lang::prelude::Pubkey;
-use anchor_lang::{AccountDeserialize, AccountSerialize, Owner, Result};
+use anchor_lang::{
+    AccountDeserialize, AccountSerialize, AnchorDeserialize, AnchorSerialize, Owner, Result,
+};
 use borsh::{BorshDeserialize, BorshSerialize};
 use std::io::Write;
+
+pub trait Len {
+    fn len() -> usize;
+}
 
 #[derive(BorshSerialize, BorshDeserialize, Clone)]
 pub enum AccountType {
@@ -80,6 +86,11 @@ macro_rules! generate_implementations {
             impl Owner for $account {
                 fn owner() -> Pubkey {
                     ID
+                }
+            }
+            impl Len for $account {
+                fn len() -> usize {
+                    std::mem::size_of::<$account>()
                 }
             }
         )+
