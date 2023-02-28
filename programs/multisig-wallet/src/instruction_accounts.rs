@@ -48,6 +48,7 @@ pub struct GiveUpOwnership<'info> {
     /// CHECK: pda acting as the authority of all wallet token accounts
     #[account(seeds = ["authority".as_bytes().as_ref(), wallet.key().as_ref()], bump)]
     pub wallet_authority: Option<UncheckedAccount<'info>>,
+    pub token_program: Option<Program<'info, Token>>,
 }
 
 #[derive(Accounts)]
@@ -63,6 +64,9 @@ pub struct CreateProposal<'info> {
               seeds = ["votes".as_bytes().as_ref(), wallet.key().as_ref(), proposal.key().as_ref()], bump)]
     pub vote_count: Account<'info, VoteCount>,
     pub system_program: Program<'info, System>,
+
+    // required in case of creating a transfer proposal
+    pub receive_account: Option<Account<'info, TokenAccount>>,
 }
 
 // used for vote and revoke_vote instruction

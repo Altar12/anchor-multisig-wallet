@@ -35,26 +35,26 @@ pub enum ProposalType {
 
 #[derive(BorshSerialize, BorshDeserialize, Clone)]
 pub struct WalletConfig {
-    pub key: AccountType,
+    pub discriminator: AccountType,
     pub m: u8,
     pub n: u8,
     pub owners: u8,
     pub owner_identities: [u8; 32],
-    pub proposal_lifetime: i32,
+    pub proposal_lifetime: i64,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone)]
 pub struct WalletAuth {
-    pub key: AccountType,
+    pub discriminator: AccountType,
     pub owner: Pubkey,
     pub wallet: Pubkey,
     pub id: u8,
-    pub added_time: i32,
+    pub added_time: i64,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone)]
 pub struct Proposal {
-    pub key: AccountType,
+    pub discriminator: AccountType,
     pub wallet: Pubkey,
     pub proposer: Pubkey,
     pub proposal: ProposalType,
@@ -62,8 +62,8 @@ pub struct Proposal {
 
 #[derive(BorshSerialize, BorshDeserialize, Clone)]
 pub struct VoteCount {
-    pub key: AccountType,
-    pub proposed_time: i32,
+    pub discriminator: AccountType,
+    pub proposed_time: i64,
     pub votes: u8,
     pub vote_record: [u8; 32],
 }
