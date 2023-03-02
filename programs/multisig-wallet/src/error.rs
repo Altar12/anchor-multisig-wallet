@@ -26,4 +26,8 @@ pub enum WalletError {
     NotEnoughVotes,
     #[msg("Wallet already has max (255) number of owners")]
     MaxOwners,
+    #[msg(
+        "The number of owner addresses passed and the number of wallet auths passed is different"
+    )]
+    SizeMismatch,
 }

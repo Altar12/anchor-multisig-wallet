@@ -4,13 +4,12 @@ pub mod state;
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{
-    account_info::next_account_info, borsh::try_from_slice_unchecked, program::invoke_signed,
-    rent::Rent, system_instruction,
+    account_info::next_account_info, program::invoke_signed, rent::Rent, system_instruction,
 };
-use anchor_spl::token::{self, Transfer};
+use anchor_spl::token::{self, TokenAccount, Transfer};
 use error::*;
 use instruction_accounts::*;
-use state::{AccountType, Len, Proposal, ProposalType, VoteCount, WalletAuth};
+use state::{AccountType, Len, Proposal, ProposalType, VoteCount, WalletAuth, WalletConfig};
 use std::convert::TryInto;
 
 declare_id!("5wgwCaNBvEBz2LCxdL5nTZSab8wwDDpHfX8RaoW1jRpu");
@@ -19,12 +18,13 @@ declare_id!("5wgwCaNBvEBz2LCxdL5nTZSab8wwDDpHfX8RaoW1jRpu");
 pub mod multisig_wallet {
 
     use super::*;
-    /* complete this implementation later
+
     pub fn create_wallet(
         ctx: Context<CreateWallet>,
         m: u8,
         n: u8,
         owners: Vec<Pubkey>,
+        proposal_lifetime: i64,
     ) -> Result<()> {
         require!(m > 0 && n > 0, WalletError::ZeroParameters);
         require!(m <= n, WalletError::InvalidParameters);
@@ -33,18 +33,30 @@ pub mod multisig_wallet {
             ctx.remaining_accounts.len(),
             WalletError::SizeMismatch
         );
+        require!(proposal_lifetime >= 600, WalletError::TooShortDuration);
+
+        ctx.accounts.wallet_auth.set_inner(WalletAuth {
+            discriminator: AccountType::WalletAuth,
+            owner: ctx.accounts.user.key(),
+            wallet: ctx.accounts.wallet.key(),
+            id: 0,
+            added_time: Clock::get()?.unix_timestamp,
+        });
 
         let wallet_key = ctx.accounts.wallet.key();
         let rent_amount = Rent::get()?.minimum_balance(WalletAuth::len());
         let account_size: u64 = WalletAuth::len().try_into().unwrap();
+        let user = ctx.accounts.user.to_account_info();
+        let current_time = Clock::get()?.unix_timestamp;
+        let mut wallet_auth_account: &AccountInfo;
         let mut wallet_auth_address: Pubkey;
+        let mut wallet_auth: WalletAuth;
         let mut bump: u8;
         let mut owner: Pubkey;
+        let mut id = 1;
         let account_info_iter = &mut ctx.remaining_accounts.iter();
-        for i in 0..account_info_iter.len() {
-            let wallet_auth_account = &ctx.remaining_accounts[i];
-            owner = owners[i];
-            let user = &ctx.accounts.user.to_account_info();
+        for owner in owners {
+            wallet_auth_account = next_account_info(account_info_iter)?;
             // verify the wallet_auth passed has correct address
             (wallet_auth_address, bump) = Pubkey::find_program_address(
                 &[
@@ -62,7 +74,7 @@ pub mod multisig_wallet {
             // create the wallet_auth
             invoke_signed(
                 &system_instruction::create_account(
-                    ctx.accounts.user.key,
+                    user.key,
                     wallet_auth_account.key,
                     rent_amount,
                     account_size,
@@ -77,8 +89,39 @@ pub mod multisig_wallet {
                 ]],
             )?;
             // initialise the wallet_auth
+            wallet_auth = WalletAuth {
+                discriminator: AccountType::WalletAuth,
+                owner,
+                wallet: wallet_key,
+                id,
+                added_time: current_time,
+            };
+            wallet_auth.serialize(&mut &mut wallet_auth_account.data.borrow_mut()[..])?;
+            id += 1;
         }
-        let test = &mut ctx.accounts.user;
+        // initialise wallet_config
+        let mut owner_identities = [0u8; 32];
+        let last_byte = ((id - 1) / 8) as usize;
+        let last_owner_pos = (id - 1) % 8;
+        for byte in 0..last_byte {
+            owner_identities[byte] = 255;
+        }
+        let mut record_string = String::new();
+        for _ in 0..=last_owner_pos {
+            record_string.push('1');
+        }
+        for _ in (last_owner_pos + 1)..8 {
+            record_string.push('0');
+        }
+        owner_identities[last_byte] = u8::from_str_radix(&record_string, 2).unwrap();
+        ctx.accounts.wallet.set_inner(WalletConfig {
+            discriminator: AccountType::WalletConfig,
+            m,
+            n,
+            owners: ctx.remaining_accounts.len().try_into().unwrap(),
+            owner_identities,
+            proposal_lifetime,
+        });
         Ok(())
     }
     pub fn give_up_ownership(ctx: Context<GiveUpOwnership>) -> Result<()> {
@@ -109,10 +152,16 @@ pub mod multisig_wallet {
                 .unwrap()
                 .to_account_info();
             let account_info_iter = &mut ctx.remaining_accounts.iter();
-            for _i in 0..ctx.remaining_accounts.len() / 2 {
-                let send_account = next_account_info(account_info_iter)?.clone();
-                let receive_account = next_account_info(account_info_iter)?.clone();
-                let cpi_context = CpiContext::new(
+            let mut send_account;
+            let mut receive_account;
+            let mut amount;
+            let mut cpi_context;
+            while account_info_iter.len() > 0 {
+                send_account = next_account_info(account_info_iter)?.clone();
+                receive_account = next_account_info(account_info_iter)?.clone();
+                amount =
+                    TokenAccount::try_deserialize(&mut &send_account.data.borrow()[..])?.amount;
+                cpi_context = CpiContext::new(
                     cpi_program.clone(),
                     Transfer {
                         from: send_account,
@@ -120,10 +169,15 @@ pub mod multisig_wallet {
                         authority: authority.clone(),
                     },
                 );
+                token::transfer(
+                    cpi_context
+                        .with_signer(&[&["authority".as_bytes().as_ref(), &[authority_bump]]]),
+                    amount,
+                )?;
             }
         }
         Ok(())
-    }*/
+    }
     pub fn create_token_account(_ctx: Context<CreateTokenAccount>) -> Result<()> {
         Ok(())
     }
