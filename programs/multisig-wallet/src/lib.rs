@@ -19,8 +19,8 @@ pub mod multisig_wallet {
 
     use super::*;
 
-    pub fn create_wallet(
-        ctx: Context<CreateWallet>,
+    pub fn create_wallet<'info>(
+        ctx: Context<'_, '_, '_, 'info, CreateWallet<'info>>,
         m: u8,
         n: u8,
         owners: Vec<Pubkey>,
@@ -52,7 +52,6 @@ pub mod multisig_wallet {
         let mut wallet_auth_address: Pubkey;
         let mut wallet_auth: WalletAuth;
         let mut bump: u8;
-        let mut owner: Pubkey;
         let mut id = 1;
         let account_info_iter = &mut ctx.remaining_accounts.iter();
         for owner in owners {
@@ -124,7 +123,9 @@ pub mod multisig_wallet {
         });
         Ok(())
     }
-    pub fn give_up_ownership(ctx: Context<GiveUpOwnership>) -> Result<()> {
+    pub fn give_up_ownership<'info>(
+        ctx: Context<'_, '_, '_, 'info, GiveUpOwnership<'info>>,
+    ) -> Result<()> {
         // if owner count = 1 and accounts present in remaining accounts
         // transfer the funds to specified accounts
         // else update owner count and owner record in wallet
