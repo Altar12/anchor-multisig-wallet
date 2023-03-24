@@ -2,6 +2,8 @@ use anchor_lang::error_code;
 
 #[error_code]
 pub enum WalletError {
+    #[msg("Wallet name can not be empty and must be less than max limit in length")]
+    InvalidName,
     #[msg("Wallet parameters m and n can not be zero")]
     ZeroParameters,
     #[msg("Wallet parameter m should be less than or equal to n")]

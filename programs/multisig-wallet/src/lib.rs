@@ -21,11 +21,16 @@ pub mod multisig_wallet {
 
     pub fn create_wallet<'info>(
         ctx: Context<'_, '_, '_, 'info, CreateWallet<'info>>,
+        name: String,
         m: u8,
         n: u8,
         owners: Vec<Pubkey>,
         proposal_lifetime: i64,
     ) -> Result<()> {
+        require!(
+            name.len() > 0 && name.len() < WalletConfig::MAX_NAME_LEN,
+            WalletError::InvalidName
+        );
         require!(m > 0 && n > 0, WalletError::ZeroParameters);
         require!(m <= n, WalletError::InvalidParameters);
         require_eq!(
@@ -115,6 +120,7 @@ pub mod multisig_wallet {
         owner_identities[last_byte] = u8::from_str_radix(&record_string, 2).unwrap();
         ctx.accounts.wallet.set_inner(WalletConfig {
             discriminator: AccountType::WalletConfig,
+            name,
             m,
             n,
             owners: ctx.remaining_accounts.len().try_into().unwrap(),

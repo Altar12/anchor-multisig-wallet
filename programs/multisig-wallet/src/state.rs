@@ -36,6 +36,7 @@ pub enum ProposalType {
 #[derive(BorshSerialize, BorshDeserialize, Clone)]
 pub struct WalletConfig {
     pub discriminator: AccountType,
+    pub name: String, // max length of 20 bytes
     pub m: u8,
     pub n: u8,
     pub owners: u8,
@@ -97,4 +98,30 @@ macro_rules! generate_implementations {
     }
 }
 
-generate_implementations!(WalletConfig, WalletAuth, Proposal, VoteCount);
+generate_implementations!(WalletAuth, Proposal, VoteCount);
+
+impl WalletConfig {
+    pub const MAX_NAME_LEN: usize = 20;
+}
+impl AccountSerialize for WalletConfig {
+    fn try_serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
+        self.serialize(writer)?;
+        Ok(())
+    }
+}
+impl AccountDeserialize for WalletConfig {
+    fn try_deserialize_unchecked(buf: &mut &[u8]) -> Result<Self> {
+        let result = WalletConfig::deserialize(buf)?;
+        Ok(result)
+    }
+}
+impl Owner for WalletConfig {
+    fn owner() -> Pubkey {
+        ID
+    }
+}
+impl Len for WalletConfig {
+    fn len() -> usize {
+        1 + (4 + Self::MAX_NAME_LEN) + 1 + 1 + 1 + 32 + 8
+    }
+}
