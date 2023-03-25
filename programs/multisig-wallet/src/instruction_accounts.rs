@@ -112,6 +112,7 @@ pub struct CloseProposal<'info> {
                              else { panic!("redundant account, not a transfer proposal") })]
     pub receive_account: Option<Account<'info, TokenAccount>>,
     /// CHECK: pda acting as the authority of all wallet token accounts
+    #[account(seeds=["authority".as_bytes().as_ref(), wallet.key().as_ref()], bump)]
     pub wallet_authority: Option<UncheckedAccount<'info>>,
     pub token_program: Option<Program<'info, Token>>,
 }
