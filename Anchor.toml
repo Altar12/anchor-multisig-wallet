@@ -2,13 +2,13 @@
 seeds = false
 skip-lint = false
 [programs.localnet]
-multisig_wallet = "5wgwCaNBvEBz2LCxdL5nTZSab8wwDDpHfX8RaoW1jRpu"
+multisig_wallet = "HayWTxKiQxSMeUTPYtxPMmNbjTDfE4kvDP7hypkyLyAC"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "Devnet"
 wallet = "/home/shubh/.config/solana/id.json"
 
 [scripts]

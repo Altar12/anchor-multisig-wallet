@@ -1,24 +1,11 @@
-use crate::ID;
-use anchor_lang::prelude::Pubkey;
-use anchor_lang::{
-    AccountDeserialize, AccountSerialize, AnchorDeserialize, AnchorSerialize, Owner, Result,
-};
+use anchor_lang::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
-use std::io::Write;
 
 pub trait Len {
     fn len() -> usize;
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Clone)]
-pub enum AccountType {
-    WalletConfig,
-    WalletAuth,
-    Proposal,
-    VoteCount,
-}
-
-#[derive(BorshSerialize, BorshDeserialize, Clone)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub enum ProposalType {
     Transfer {
         token_mint: Pubkey,
@@ -33,9 +20,17 @@ pub enum ProposalType {
     },
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Clone)]
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct RawWalletAuth {
+    pub discriminator: [u8; 8],
+    pub owner: Pubkey,
+    pub wallet: Pubkey,
+    pub id: u8,
+    pub added_time: i64,
+}
+
+#[account]
 pub struct WalletConfig {
-    pub discriminator: AccountType,
     pub name: String, // max length of 20 bytes
     pub m: u8,
     pub n: u8,
@@ -44,26 +39,23 @@ pub struct WalletConfig {
     pub proposal_lifetime: i64,
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Clone)]
+#[account]
 pub struct WalletAuth {
-    pub discriminator: AccountType,
     pub owner: Pubkey,
     pub wallet: Pubkey,
     pub id: u8,
     pub added_time: i64,
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Clone)]
+#[account]
 pub struct Proposal {
-    pub discriminator: AccountType,
     pub wallet: Pubkey,
     pub proposer: Pubkey,
     pub proposal: ProposalType,
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Clone)]
+#[account]
 pub struct VoteCount {
-    pub discriminator: AccountType,
     pub proposed_time: i64,
     pub votes: u8,
     pub vote_record: [u8; 32],
@@ -72,26 +64,9 @@ pub struct VoteCount {
 macro_rules! generate_implementations {
     ($($account:ident),+ $(,)?) => {
         $(
-            impl AccountSerialize for $account {
-                fn try_serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-                    self.serialize(writer)?;
-                    Ok(())
-                }
-            }
-            impl AccountDeserialize for $account {
-                fn try_deserialize_unchecked(buf: &mut &[u8]) -> Result<Self> {
-                    let result = $account::deserialize(buf)?;
-                    Ok(result)
-                }
-            }
-            impl Owner for $account {
-                fn owner() -> Pubkey {
-                    ID
-                }
-            }
             impl Len for $account {
                 fn len() -> usize {
-                    std::mem::size_of::<$account>()
+                    8 + std::mem::size_of::<$account>()
                 }
             }
         )+
@@ -103,25 +78,9 @@ generate_implementations!(WalletAuth, Proposal, VoteCount);
 impl WalletConfig {
     pub const MAX_NAME_LEN: usize = 20;
 }
-impl AccountSerialize for WalletConfig {
-    fn try_serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.serialize(writer)?;
-        Ok(())
-    }
-}
-impl AccountDeserialize for WalletConfig {
-    fn try_deserialize_unchecked(buf: &mut &[u8]) -> Result<Self> {
-        let result = WalletConfig::deserialize(buf)?;
-        Ok(result)
-    }
-}
-impl Owner for WalletConfig {
-    fn owner() -> Pubkey {
-        ID
-    }
-}
+
 impl Len for WalletConfig {
     fn len() -> usize {
-        1 + (4 + Self::MAX_NAME_LEN) + 1 + 1 + 1 + 32 + 8
+        8 + (4 + Self::MAX_NAME_LEN) + 1 + 1 + 1 + 32 + 8
     }
 }

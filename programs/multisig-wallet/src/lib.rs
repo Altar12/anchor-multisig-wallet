@@ -9,10 +9,10 @@ use anchor_lang::solana_program::{
 use anchor_spl::token::{self, TokenAccount, Transfer};
 use error::*;
 use instruction_accounts::*;
-use state::{AccountType, Len, Proposal, ProposalType, VoteCount, WalletAuth, WalletConfig};
+use state::{Len, Proposal, ProposalType, RawWalletAuth, VoteCount, WalletAuth, WalletConfig};
 use std::convert::TryInto;
 
-declare_id!("5wgwCaNBvEBz2LCxdL5nTZSab8wwDDpHfX8RaoW1jRpu");
+declare_id!("HayWTxKiQxSMeUTPYtxPMmNbjTDfE4kvDP7hypkyLyAC");
 
 #[program]
 pub mod multisig_wallet {
@@ -41,7 +41,6 @@ pub mod multisig_wallet {
         require!(proposal_lifetime >= 600, WalletError::TooShortDuration);
 
         ctx.accounts.wallet_auth.set_inner(WalletAuth {
-            discriminator: AccountType::WalletAuth,
             owner: ctx.accounts.user.key(),
             wallet: ctx.accounts.wallet.key(),
             id: 0,
@@ -55,7 +54,7 @@ pub mod multisig_wallet {
         let current_time = Clock::get()?.unix_timestamp;
         let mut wallet_auth_account: &AccountInfo;
         let mut wallet_auth_address: Pubkey;
-        let mut wallet_auth: WalletAuth;
+        let mut wallet_auth: RawWalletAuth;
         let mut bump: u8;
         let mut id = 1;
         let account_info_iter = &mut ctx.remaining_accounts.iter();
@@ -93,8 +92,8 @@ pub mod multisig_wallet {
                 ]],
             )?;
             // initialise the wallet_auth
-            wallet_auth = WalletAuth {
-                discriminator: AccountType::WalletAuth,
+            wallet_auth = RawWalletAuth {
+                discriminator: [131, 111, 99, 219, 98, 234, 255, 179],
                 owner,
                 wallet: wallet_key,
                 id,
@@ -118,12 +117,12 @@ pub mod multisig_wallet {
             record_string.push('0');
         }
         owner_identities[last_byte] = u8::from_str_radix(&record_string, 2).unwrap();
+        let other_owner_count: u8 = ctx.remaining_accounts.len().try_into().unwrap();
         ctx.accounts.wallet.set_inner(WalletConfig {
-            discriminator: AccountType::WalletConfig,
             name,
             m,
             n,
-            owners: ctx.remaining_accounts.len().try_into().unwrap(),
+            owners: other_owner_count + 1,
             owner_identities,
             proposal_lifetime,
         });
@@ -210,7 +209,6 @@ pub mod multisig_wallet {
             _ => (),
         }
         ctx.accounts.proposal.set_inner(Proposal {
-            discriminator: AccountType::Proposal,
             wallet: ctx.accounts.wallet.key(),
             proposer: ctx.accounts.user.key(),
             proposal,
@@ -226,7 +224,6 @@ pub mod multisig_wallet {
         }
         vote_record[(user_id / 8) as usize] = u8::from_str_radix(&vote_string, 2).unwrap();
         ctx.accounts.vote_count.set_inner(VoteCount {
-            discriminator: AccountType::VoteCount,
             proposed_time: Clock::get()?.unix_timestamp,
             votes: 1,
             vote_record,
@@ -336,7 +333,6 @@ pub mod multisig_wallet {
                                 .as_mut()
                                 .unwrap()
                                 .set_inner(WalletAuth {
-                                    discriminator: AccountType::WalletAuth,
                                     owner: user,
                                     wallet: wallet.key(),
                                     id: (byte_count * 8 + pos) as u8,
