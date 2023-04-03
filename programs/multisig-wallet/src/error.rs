@@ -32,4 +32,8 @@ pub enum WalletError {
         "The number of owner addresses passed and the number of wallet auths passed is different"
     )]
     SizeMismatch,
+    #[msg("Token account passed is incorrect")]
+    IncorrectTokenAccount,
+    #[msg("The instruction called and proposal passed do not match")]
+    ProposalInstructionMismatch,
 }

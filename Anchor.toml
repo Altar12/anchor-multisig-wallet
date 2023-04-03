@@ -2,7 +2,7 @@
 seeds = false
 skip-lint = false
 [programs.localnet]
-multisig_wallet = "HayWTxKiQxSMeUTPYtxPMmNbjTDfE4kvDP7hypkyLyAC"
+multisig_wallet = "39FJGfw5aXNhpNN3bJAVQeDpm6AsNRupUD8L7NBPvABp"
 
 [registry]
 url = "https://api.apr.dev"

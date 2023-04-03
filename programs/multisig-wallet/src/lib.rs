@@ -12,7 +12,7 @@ use instruction_accounts::*;
 use state::{Len, Proposal, ProposalType, RawWalletAuth, VoteCount, WalletAuth, WalletConfig};
 use std::convert::TryInto;
 
-declare_id!("HayWTxKiQxSMeUTPYtxPMmNbjTDfE4kvDP7hypkyLyAC");
+declare_id!("39FJGfw5aXNhpNN3bJAVQeDpm6AsNRupUD8L7NBPvABp");
 
 #[program]
 pub mod multisig_wallet {
@@ -262,7 +262,7 @@ pub mod multisig_wallet {
         vote_count.votes = vote_count.votes.checked_sub(1).unwrap();
         Ok(())
     }
-    pub fn close_proposal(ctx: Context<CloseProposal>) -> Result<()> {
+    pub fn transfer(ctx: Context<TransferFunds>) -> Result<()> {
         let wallet = &ctx.accounts.wallet;
         let vote_count = &ctx.accounts.vote_count;
         if Clock::get()?.unix_timestamp >= vote_count.proposed_time + wallet.proposal_lifetime {
@@ -274,44 +274,68 @@ pub mod multisig_wallet {
             WalletError::NotEnoughVotes
         );
         match ctx.accounts.proposal.proposal {
-            ProposalType::Transfer { amount, .. } => {
-                let cpi_program = ctx
-                    .accounts
-                    .token_program
-                    .as_ref()
-                    .unwrap()
-                    .to_account_info();
+            ProposalType::Transfer {
+                token_mint,
+                receive_account,
+                amount,
+            } => {
+                msg!("3");
+                let cpi_program = ctx.accounts.token_program.to_account_info();
+                msg!("4");
+                let from_account = &ctx.accounts.send_account;
+                msg!("5");
+                let to_account = &ctx.accounts.receive_account;
+                msg!("6");
+                require_keys_eq!(
+                    from_account.mint,
+                    token_mint,
+                    WalletError::IncorrectTokenAccount
+                );
+                msg!("7");
+                require_keys_eq!(
+                    to_account.key(),
+                    receive_account,
+                    WalletError::IncorrectTokenAccount
+                );
+                msg!("8");
                 let cpi_context = CpiContext::new(
                     cpi_program,
                     Transfer {
-                        from: ctx
-                            .accounts
-                            .send_account
-                            .as_ref()
-                            .unwrap()
-                            .to_account_info(),
-                        to: ctx
-                            .accounts
-                            .receive_account
-                            .as_ref()
-                            .unwrap()
-                            .to_account_info(),
-                        authority: ctx
-                            .accounts
-                            .wallet_authority
-                            .as_ref()
-                            .unwrap()
-                            .to_account_info(),
+                        from: from_account.to_account_info(),
+                        to: to_account.to_account_info(),
+                        authority: ctx.accounts.wallet_authority.to_account_info(),
                     },
                 );
+                msg!("9");
                 token::transfer(
                     cpi_context.with_signer(&[&[
                         "authority".as_bytes().as_ref(),
+                        wallet.key().as_ref(),
                         &[*ctx.bumps.get("wallet_authority").unwrap()],
                     ]]),
                     amount,
                 )?;
+                msg!("10");
             }
+            _ => return err!(WalletError::ProposalInstructionMismatch),
+        }
+        Ok(())
+    }
+
+    pub fn add_owner(ctx: Context<AddOwner>) -> Result<()> {
+        msg!("1");
+        let wallet = &ctx.accounts.wallet;
+        let vote_count = &ctx.accounts.vote_count;
+        if Clock::get()?.unix_timestamp >= vote_count.proposed_time + wallet.proposal_lifetime {
+            return Ok(());
+        }
+        require_gte!(
+            vote_count.votes,
+            (wallet.owners * wallet.m) / wallet.n,
+            WalletError::NotEnoughVotes
+        );
+        msg!("2");
+        match ctx.accounts.proposal.proposal {
             ProposalType::AddOwner { user } => {
                 let wallet = &mut ctx.accounts.wallet;
                 require!(wallet.owners < 255, WalletError::MaxOwners);
@@ -328,24 +352,39 @@ pub mod multisig_wallet {
                             wallet.owner_identities[byte_count] =
                                 u8::from_str_radix(&owner_str, 2).unwrap();
                             wallet.owners = wallet.owners.checked_add(1).unwrap();
-                            ctx.accounts
-                                .wallet_auth
-                                .as_mut()
-                                .unwrap()
-                                .set_inner(WalletAuth {
-                                    owner: user,
-                                    wallet: wallet.key(),
-                                    id: (byte_count * 8 + pos) as u8,
-                                    added_time: Clock::get()?.unix_timestamp,
-                                });
+                            ctx.accounts.wallet_auth.set_inner(WalletAuth {
+                                owner: user,
+                                wallet: wallet.key(),
+                                id: (byte_count * 8 + pos) as u8,
+                                added_time: Clock::get()?.unix_timestamp,
+                            });
+                            return Ok(());
                         }
                     }
                     byte_count += 1;
                 }
             }
+            _ => return err!(WalletError::ProposalInstructionMismatch),
+        }
+    }
+    pub fn change_lifetime(ctx: Context<ChangeLifetime>) -> Result<()> {
+        msg!("1");
+        let wallet = &ctx.accounts.wallet;
+        let vote_count = &ctx.accounts.vote_count;
+        if Clock::get()?.unix_timestamp >= vote_count.proposed_time + wallet.proposal_lifetime {
+            return Ok(());
+        }
+        require_gte!(
+            vote_count.votes,
+            (wallet.owners * wallet.m) / wallet.n,
+            WalletError::NotEnoughVotes
+        );
+        msg!("2");
+        match ctx.accounts.proposal.proposal {
             ProposalType::ChangeProposalLifetime { duration } => {
                 ctx.accounts.wallet.proposal_lifetime = duration;
             }
+            _ => return err!(WalletError::ProposalInstructionMismatch),
         }
         Ok(())
     }

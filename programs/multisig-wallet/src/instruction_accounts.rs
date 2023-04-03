@@ -83,7 +83,7 @@ pub struct Voting<'info> {
 }
 
 #[derive(Accounts)]
-pub struct CloseProposal<'info> {
+pub struct TransferFunds<'info> {
     pub wallet: Account<'info, WalletConfig>,
     #[account(mut, close = proposer)]
     pub proposal: Account<'info, Proposal>,
@@ -93,26 +93,46 @@ pub struct CloseProposal<'info> {
     /// CHECK: proposer will receive funds from closing the accounts, just need to check the address
     #[account(mut, address = proposal.proposer)]
     pub proposer: UncheckedAccount<'info>,
-
-    // below accounts required in case of an add owner proposal
+    #[account(mut, token::authority = wallet_authority)]
+    pub send_account: Account<'info, TokenAccount>,
     #[account(mut)]
-    pub payer: Option<Signer<'info>>,
+    pub receive_account: Account<'info, TokenAccount>,
+    /// CHECK: pda acting as the authority of all wallet token accounts
+    #[account(seeds=["authority".as_bytes().as_ref(), wallet.key().as_ref()], bump)]
+    pub wallet_authority: UncheckedAccount<'info>,
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+pub struct AddOwner<'info> {
+    pub wallet: Account<'info, WalletConfig>,
+    #[account(mut, close = proposer)]
+    pub proposal: Account<'info, Proposal>,
+    #[account(mut, close = proposer,
+              seeds = ["votes".as_bytes().as_ref(), wallet.key().as_ref(), proposal.key().as_ref()], bump)]
+    pub vote_count: Account<'info, VoteCount>,
+    /// CHECK: proposer will receive funds from closing the accounts, just need to check the address
+    #[account(mut, address = proposal.proposer)]
+    pub proposer: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
     #[account(init, payer = payer, space = WalletAuth::len(),
               seeds = ["owner".as_bytes().as_ref(), wallet.key().as_ref(),
                        (if let ProposalType::AddOwner{user}=proposal.proposal { user }
                         else { panic!("redundant account, not an add owner proposal") }).as_ref()], bump)]
-    pub wallet_auth: Option<Account<'info, WalletAuth>>,
-    pub system_program: Option<Program<'info, System>>,
+    pub wallet_auth: Account<'info, WalletAuth>,
+    pub system_program: Program<'info, System>,
+}
 
-    // below accounts required in case of a transfer proposal
-    #[account(mut, token::authority = wallet_authority,
-              constraint = send_account.mint == receive_account.as_ref().unwrap().mint)]
-    pub send_account: Option<Account<'info, TokenAccount>>,
-    #[account(mut, address = if let ProposalType::Transfer{ receive_account: address, token_mint, .. } = proposal.proposal { require_keys_eq!(receive_account.mint, token_mint); address }
-                             else { panic!("redundant account, not a transfer proposal") })]
-    pub receive_account: Option<Account<'info, TokenAccount>>,
-    /// CHECK: pda acting as the authority of all wallet token accounts
-    #[account(seeds=["authority".as_bytes().as_ref(), wallet.key().as_ref()], bump)]
-    pub wallet_authority: Option<UncheckedAccount<'info>>,
-    pub token_program: Option<Program<'info, Token>>,
+#[derive(Accounts)]
+pub struct ChangeLifetime<'info> {
+    pub wallet: Account<'info, WalletConfig>,
+    #[account(mut, close = proposer)]
+    pub proposal: Account<'info, Proposal>,
+    #[account(mut, close = proposer,
+              seeds = ["votes".as_bytes().as_ref(), wallet.key().as_ref(), proposal.key().as_ref()], bump)]
+    pub vote_count: Account<'info, VoteCount>,
+    /// CHECK: proposer will receive funds from closing the accounts, just need to check the address
+    #[account(mut, address = proposal.proposer)]
+    pub proposer: UncheckedAccount<'info>,
 }
